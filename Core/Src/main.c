@@ -45,9 +45,6 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-volatile char * vcomRecvBuffer;
-volatile int vcomRecvBufferLen;
-volatile int vcomRecvBufferCounter;
 
 /* USER CODE END PV */
 
@@ -64,21 +61,36 @@ static void MX_GPIO_Init(void);
 
 //Transmit stdout data via Virtual Com
 extern USBD_HandleTypeDef hUsbDeviceFS;
+#define BUF_LEN 1000
+char inputBuf[BUF_LEN];
+int writePtr = 0;
+int readPtr = 0;
 
-int __unused _read (__unused int file, char *ptr, int len)
-{
-    if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED) {
+void recordInputData(char const *data, int len) {
+    int l = 0;
+    for(; l<len;l++) {
+        inputBuf[writePtr]= data[l];
+        writePtr = (writePtr + 1) % BUF_LEN;
+        if(readPtr == writePtr) {
+            readPtr = (readPtr + 1) % BUF_LEN;
+        }
+    }
+}
+
+int __unused _read(__unused int file, char *ptr, int len) {
+
+    if (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED || readPtr == writePtr) {
         return -1;
     }
+    int l = 0;
     __disable_irq();
-    vcomRecvBuffer = ptr;
-    vcomRecvBufferLen = len;
-    vcomRecvBufferCounter = 0;
-    __enable_irq();
-    while(vcomRecvBufferCounter == 0) {
-        //WFI
+    while (writePtr != readPtr && len > l) {
+        ptr[l] = inputBuf[readPtr];
+        readPtr = (readPtr + 1) % BUF_LEN;
+        l++;
     }
-    return vcomRecvBufferCounter;
+    __enable_irq();
+    return l;
 }
 
 
@@ -142,13 +154,22 @@ int main(void) {
         char buf[100];
         HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
         HAL_Delay(250);
-        HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-        HAL_Delay(250);
-        HAL_GPIO_TogglePin(LD8_GPIO_Port, LD8_Pin);
-        HAL_Delay(250);
-        puts("again:");
         char *str = gets(buf);
-        printf("Received: %s\n",str == NULL ? "---" : str);
+        if(str!=NULL) {
+            printf("Received: %s\n\r", str);
+            if (!strcasecmp("RED", str)) {
+                HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+                HAL_GPIO_TogglePin(LD10_GPIO_Port, LD10_Pin);
+            } else if (!strcasecmp("ORANGE", str)) {
+                HAL_GPIO_TogglePin(LD5_GPIO_Port, LD5_Pin);
+                HAL_GPIO_TogglePin(LD8_GPIO_Port, LD8_Pin);
+            } else if (!strcasecmp("BLUE", str)) {
+                HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
+                HAL_GPIO_TogglePin(LD9_GPIO_Port, LD9_Pin);
+            } else if (!strcasecmp("GREEN", str)) {
+                HAL_GPIO_TogglePin(LD7_GPIO_Port, LD7_Pin);
+            }
+        }
     }
 #pragma clang diagnostic pop
     /* USER CODE END 3 */

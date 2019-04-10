@@ -32,9 +32,6 @@
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-extern volatile char * vcomRecvBuffer;
-extern volatile int  vcomRecvBufferLen;
-extern volatile int  vcomRecvBufferCounter;
 
 /* USER CODE END PV */
 
@@ -135,6 +132,7 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length);
 static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t *Len);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
+extern void recordInputData(char const *data, int len);
 
 /* USER CODE END PRIVATE_FUNCTIONS_DECLARATION */
 
@@ -266,13 +264,10 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  if(vcomRecvBuffer != NULL) {
-      vcomRecvBufferCounter = (*Len) > vcomRecvBufferLen ? vcomRecvBufferLen : (*Len);
-      memccpy((void*)vcomRecvBuffer,Buf,sizeof(char),vcomRecvBufferCounter);
-  }
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
-  USBD_CDC_ReceivePacket(&hUsbDeviceFS);
-  return (USBD_OK);
+    recordInputData((char *) Buf, *Len);
+    USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+    USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+    return (USBD_OK);
   /* USER CODE END 6 */
 }
 
